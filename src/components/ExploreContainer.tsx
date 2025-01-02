@@ -3,14 +3,14 @@ import { IonButton } from "@ionic/react";
 import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import {
+  FaceMesh,
   FaceMeshDetection,
   UseCase,
 } from "@capacitor-mlkit/face-mesh-detection";
 
 const ExploreContainer: React.FC = () => {
-  const [image, setImage] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [landmarks, setLandmarks] = useState<any[]>([]);
+  const [landmarks, setLandmarks] = useState<FaceMesh[] | null>(null);
 
   // Função para salvar a imagem como um arquivo temporário
   const saveImageToFile = async (
@@ -55,11 +55,10 @@ const ExploreContainer: React.FC = () => {
       });
 
       const imageBase64 = photo.base64String;
-
       if (imageBase64) {
         const savedImagePath = await saveImageToFile(imageBase64);
         if (savedImagePath) {
-          setSelectedImage(savedImagePath); // Atualiza o estado da imagem
+          setSelectedImage(`data:image/jpeg;base64,${imageBase64}`); // Atualize a imagem com base64
           await processImage(savedImagePath); // Processa a imagem salva
         }
       }
@@ -80,10 +79,15 @@ const ExploreContainer: React.FC = () => {
 
       const imageBase64 = photo.base64String;
 
+      if (!imageBase64) {
+        alert("Nenhuma imagem selecionada.");
+        return;
+      }
+
       if (imageBase64) {
         const savedImagePath = await saveImageToFile(imageBase64);
         if (savedImagePath) {
-          setSelectedImage(savedImagePath); // Atualiza o estado da imagem
+          setSelectedImage(`data:image/jpeg;base64,${imageBase64}`); // Atualize a imagem com base64
           await processImage(savedImagePath); // Processa a imagem salva
         }
       }
@@ -105,33 +109,31 @@ const ExploreContainer: React.FC = () => {
           onClick={handleSelectFromGallery}
           style={{ marginLeft: "8px" }}
         >
-          Selecionar da Galeria Agora
+          Selecionar da Galeria
         </IonButton>
       </div>
 
       {/* Exibe a imagem selecionada */}
       {selectedImage && (
-        <div style={{ marginTop: "16px" }}>
-          <img
-            src={
-              typeof selectedImage === "string"
-                ? selectedImage
-                : URL.createObjectURL(selectedImage) // Converte para URL se for um objeto
-            }
-            alt="Selected"
-            style={{
-              width: "100%",
-              maxWidth: "400px",
-              margin: "16px auto",
-              display: "block",
-              objectFit: "contain", // Ajusta a imagem ao espaço
-            }}
-          />
+        <div style={{ marginTop: "16px", position: "relative" }}>
+          <img src={selectedImage} alt="Selected image" />
+          <div style={{ position: "absolute" }}>
+            <div
+              style={{
+                position: "absolute",
+                top: 50,
+                left: 50,
+                backgroundColor: "red",
+                width: "10px",
+                height: "10px",
+              }}
+            ></div>
+          </div>
         </div>
       )}
 
       {/* Exibe os landmarks detectados */}
-      {landmarks.length > 0 && (
+      {landmarks && landmarks.length > 0 && (
         <div>
           <h4>Landmarks Faciais Detectados:</h4>
           <pre style={{ whiteSpace: "pre-wrap", wordWrap: "break-word" }}>
