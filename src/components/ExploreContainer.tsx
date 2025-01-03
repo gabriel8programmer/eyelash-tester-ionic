@@ -1,16 +1,29 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { IonButton } from "@ionic/react";
 import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import {
-  FaceMesh,
   FaceMeshDetection,
+  FaceMeshPoint,
   UseCase,
 } from "@capacitor-mlkit/face-mesh-detection";
 
 const ExploreContainer: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [landmarks, setLandmarks] = useState<FaceMesh[] | null>(null);
+  const [landmarks, setLandmarks] = useState<FaceMeshPoint[] | undefined>();
+  const [imageDimensions, setImageDimensions] = useState<{
+    width: number;
+    height: number;
+  }>({ width: 0, height: 0 });
+
+  const imageRef = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    if (imageRef.current) {
+      const { width, height } = imageRef.current.getBoundingClientRect();
+      setImageDimensions({ width, height });
+    }
+  }, [selectedImage]);
 
   // Função para salvar a imagem como um arquivo temporário
   const saveImageToFile = async (
@@ -38,7 +51,12 @@ const ExploreContainer: React.FC = () => {
         path: imagePath,
         useCase: UseCase.FaceMesh,
       });
-      setLandmarks(faceMeshs);
+
+      if (!faceMeshs) {
+        alert("Nenhum rosto identificado!");
+      }
+
+      setLandmarks(faceMeshs[0].faceMeshPoints);
     } catch (error: any) {
       console.error("Erro ao processar a imagem:", error);
       alert(`Erro ao processar a imagem: ${error.message}`);
@@ -115,30 +133,63 @@ const ExploreContainer: React.FC = () => {
 
       {/* Exibe a imagem selecionada */}
       {selectedImage && (
-        <div style={{ marginTop: "16px", position: "relative" }}>
-          <img src={selectedImage} alt="Selected image" />
-          <div style={{ position: "absolute" }}>
-            <div
-              style={{
-                position: "absolute",
-                top: 50,
-                left: 50,
-                backgroundColor: "red",
-                width: "10px",
-                height: "10px",
-              }}
-            ></div>
-          </div>
-        </div>
-      )}
+        <div
+          style={{
+            marginTop: "16px",
+            position: "relative",
+            height: "350px",
+            width: "100%",
+          }}
+        >
+          <img
+            ref={imageRef}
+            src={selectedImage}
+            alt="Selected image"
+            style={{
+              display: "block",
+              width: "100%",
+              height: "auto",
+            }}
+          />
 
-      {/* Exibe os landmarks detectados */}
-      {landmarks && landmarks.length > 0 && (
-        <div>
-          <h4>Landmarks Faciais Detectados:</h4>
-          <pre style={{ whiteSpace: "pre-wrap", wordWrap: "break-word" }}>
-            {JSON.stringify(landmarks, null, 2)}
-          </pre>
+          <div style={{ margin: "2rem 0" }}>
+            {imageDimensions.width} x {imageDimensions.height}
+          </div>
+
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+            }}
+          >
+            {/* Renderizar os pontos da malha facial */}
+            {landmarks &&
+              landmarks.length &&
+              landmarks.map((face: FaceMeshPoint) => (
+                <div
+                  key={face.index}
+                  style={{
+                    position: "absolute",
+                    top: `${face.point.y}px`,
+                    left: `${face.point.x}px`,
+                    backgroundColor: "red",
+                    width: "2px",
+                    height: "2px",
+                    borderRadius: "100%",
+                    // display: "grid",
+                    // placeItems: "center",
+                    // color: "black",
+                    // fontSize: "10px",
+                  }}
+                >
+                  {/* <p>
+                    <strong>{`#${face.index}`}</strong> -
+                    {` ${face.point.x.toFixed(1)} x ${face.point.y.toFixed(1)}`}
+                  </p> */}
+                </div>
+              ))}
+          </div>
         </div>
       )}
     </div>
