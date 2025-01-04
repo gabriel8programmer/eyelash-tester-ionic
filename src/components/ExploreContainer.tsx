@@ -9,34 +9,72 @@ import {
 } from "@capacitor-mlkit/face-mesh-detection";
 
 const ExploreContainer: React.FC = () => {
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<HTMLImageElement | null>(
+    null
+  );
   const [landmarks, setLandmarks] = useState<FaceMeshPoint[] | undefined>();
-  const [imageDimensions, setImageDimensions] = useState<{
-    width: number;
-    height: number;
-  }>({ width: 0, height: 0 });
-
-  const imageRef = useRef<HTMLImageElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    if (imageRef.current) {
-      const { width, height } = imageRef.current.getBoundingClientRect();
-      setImageDimensions({ width, height });
-    }
-  }, [selectedImage]);
+    if (selectedImage && canvasRef.current) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
 
-  // Função para salvar a imagem como um arquivo temporário
+      // Ajustar o tamanho do canvas à tela
+      const { width, height } = canvas.getBoundingClientRect();
+      canvas.width = width;
+      canvas.height = height;
+
+      // Limpar o canvas antes de redesenhar
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Desenhar a imagem no canvas
+      const scale = Math.min(
+        canvas.width / selectedImage.naturalWidth,
+        canvas.height / selectedImage.naturalHeight
+      );
+
+      const xOffset = (canvas.width - selectedImage.naturalWidth * scale) / 2;
+      const yOffset = (canvas.height - selectedImage.naturalHeight * scale) / 2;
+
+      ctx.drawImage(
+        selectedImage,
+        xOffset,
+        yOffset,
+        selectedImage.naturalWidth * scale,
+        selectedImage.naturalHeight * scale
+      );
+
+      // Desenhar os pontos faciais
+      if (landmarks) {
+        ctx.fillStyle = "red";
+        landmarks.forEach((point) => {
+          ctx.beginPath();
+          ctx.arc(
+            xOffset + point.point.x * scale,
+            yOffset + point.point.y * scale,
+            2,
+            0,
+            2 * Math.PI
+          );
+          ctx.fill();
+        });
+      }
+    }
+  }, [selectedImage, landmarks]);
+
   const saveImageToFile = async (
     base64Image: string
   ): Promise<string | null> => {
     try {
-      const fileName = `${new Date().getTime()}.jpg`; // Nome de arquivo único
+      const fileName = `${new Date().getTime()}.jpg`;
       const savedFile = await Filesystem.writeFile({
         path: fileName,
         data: base64Image,
         directory: Directory.Data,
       });
-      return savedFile.uri; // Retorna o caminho da imagem salva
+      return savedFile.uri;
     } catch (error: any) {
       console.error("Erro ao salvar a imagem:", error);
       alert(`Erro ao salvar a imagem: ${error.message}`);
@@ -44,18 +82,16 @@ const ExploreContainer: React.FC = () => {
     }
   };
 
-  // Função para processar a imagem e identificar os landmarks faciais
   const processImage = async (imagePath: string) => {
     try {
       const { faceMeshs } = await FaceMeshDetection.processImage({
         path: imagePath,
         useCase: UseCase.FaceMesh,
       });
-
       if (!faceMeshs) {
         alert("Nenhum rosto identificado!");
+        return;
       }
-
       setLandmarks(faceMeshs[0].faceMeshPoints);
     } catch (error: any) {
       console.error("Erro ao processar a imagem:", error);
@@ -63,21 +99,21 @@ const ExploreContainer: React.FC = () => {
     }
   };
 
-  // Função para tirar foto usando a câmera
   const handleTakePhoto = async () => {
     try {
       const photo = await Camera.getPhoto({
-        resultType: CameraResultType.Base64, // Usando Base64 para garantir a imagem
-        source: CameraSource.Camera, // Acessa a câmera do dispositivo
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Camera,
         quality: 90,
       });
-
       const imageBase64 = photo.base64String;
       if (imageBase64) {
         const savedImagePath = await saveImageToFile(imageBase64);
         if (savedImagePath) {
-          setSelectedImage(`data:image/jpeg;base64,${imageBase64}`); // Atualize a imagem com base64
-          await processImage(savedImagePath); // Processa a imagem salva
+          const img = new Image();
+          img.src = `data:image/jpeg;base64,${imageBase64}`;
+          img.onload = () => setSelectedImage(img);
+          await processImage(savedImagePath);
         }
       }
     } catch (error: any) {
@@ -86,28 +122,24 @@ const ExploreContainer: React.FC = () => {
     }
   };
 
-  // Função para selecionar uma imagem da galeria
   const handleSelectFromGallery = async () => {
     try {
       const photo = await Camera.getPhoto({
-        resultType: CameraResultType.Base64, // Usando Base64 para garantir a imagem
-        source: CameraSource.Photos, // Acessa a galeria do dispositivo
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Photos,
         quality: 90,
       });
-
       const imageBase64 = photo.base64String;
-
       if (!imageBase64) {
         alert("Nenhuma imagem selecionada.");
         return;
       }
-
-      if (imageBase64) {
-        const savedImagePath = await saveImageToFile(imageBase64);
-        if (savedImagePath) {
-          setSelectedImage(`data:image/jpeg;base64,${imageBase64}`); // Atualize a imagem com base64
-          await processImage(savedImagePath); // Processa a imagem salva
-        }
+      const savedImagePath = await saveImageToFile(imageBase64);
+      if (savedImagePath) {
+        const img = new Image();
+        img.src = `data:image/jpeg;base64,${imageBase64}`;
+        img.onload = () => setSelectedImage(img);
+        await processImage(savedImagePath);
       }
     } catch (error: any) {
       console.error("Erro ao selecionar imagem da galeria:", error);
@@ -119,10 +151,7 @@ const ExploreContainer: React.FC = () => {
     <div id="container">
       <strong>Testando provador de Cílios</strong>
       <div style={{ marginTop: "16px" }}>
-        {/* Botão para tirar uma foto */}
         <IonButton onClick={handleTakePhoto}>Tirar Foto</IonButton>
-
-        {/* Botão para selecionar uma imagem da galeria */}
         <IonButton
           onClick={handleSelectFromGallery}
           style={{ marginLeft: "8px" }}
@@ -130,68 +159,19 @@ const ExploreContainer: React.FC = () => {
           Selecionar da Galeria
         </IonButton>
       </div>
-
-      {/* Exibe a imagem selecionada */}
-      {selectedImage && (
-        <div
-          style={{
-            marginTop: "16px",
-            position: "relative",
-            height: "350px",
-            width: "100%",
-          }}
-        >
-          <img
-            ref={imageRef}
-            src={selectedImage}
-            alt="Selected image"
-            style={{
-              display: "block",
-              width: "100%",
-              height: "auto",
-            }}
-          />
-
-          <div style={{ margin: "2rem 0" }}>
-            {imageDimensions.width} x {imageDimensions.height}
-          </div>
-
-          <div
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-            }}
-          >
-            {/* Renderizar os pontos da malha facial */}
-            {landmarks &&
-              landmarks.length &&
-              landmarks.map((face: FaceMeshPoint) => (
-                <div
-                  key={face.index}
-                  style={{
-                    position: "absolute",
-                    top: `${face.point.y}px`,
-                    left: `${face.point.x}px`,
-                    backgroundColor: "red",
-                    width: "2px",
-                    height: "2px",
-                    borderRadius: "100%",
-                    // display: "grid",
-                    // placeItems: "center",
-                    // color: "black",
-                    // fontSize: "10px",
-                  }}
-                >
-                  {/* <p>
-                    <strong>{`#${face.index}`}</strong> -
-                    {` ${face.point.x.toFixed(1)} x ${face.point.y.toFixed(1)}`}
-                  </p> */}
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
+      <div
+        style={{
+          marginTop: "16px",
+          position: "relative",
+          width: "100%",
+          height: "400px",
+        }}
+      >
+        <canvas
+          ref={canvasRef}
+          style={{ width: "100%", height: "100%", objectFit: "contain" }}
+        ></canvas>
+      </div>
     </div>
   );
 };
