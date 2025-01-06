@@ -8,15 +8,29 @@ import {
   UseCase,
 } from "@capacitor-mlkit/face-mesh-detection";
 
+import cilio from "../assets/img/cilio.png";
+
+const eyelashes = [
+  {
+    index: 1,
+    src: cilio,
+  },
+  {
+    index: 2,
+    src: cilio,
+  },
+];
+
 const ExploreContainer: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<HTMLImageElement | null>(
     null
   );
   const [landmarks, setLandmarks] = useState<FaceMeshPoint[] | undefined>();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [selectedEyelash, setSelectedEyelash] = useState<string | null>(null);
 
   useEffect(() => {
-    if (selectedImage && canvasRef.current) {
+    if (selectedImage && canvasRef.current && landmarks) {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
@@ -46,23 +60,43 @@ const ExploreContainer: React.FC = () => {
         selectedImage.naturalHeight * scale
       );
 
-      // Desenhar os pontos faciais
-      if (landmarks) {
-        ctx.fillStyle = "red";
-        landmarks.forEach((point) => {
-          ctx.beginPath();
-          ctx.arc(
-            xOffset + point.point.x * scale,
-            yOffset + point.point.y * scale,
-            2,
-            0,
-            2 * Math.PI
-          );
-          ctx.fill();
-        });
+      // Desenhar landmarks
+      // ctx.fillStyle = "red";
+      // landmarks.forEach((point) => {
+      //   ctx.beginPath();
+      //   ctx.arc(
+      //     xOffset + point.point.x * scale,
+      //     yOffset + point.point.y * scale,
+      //     1,
+      //     0,
+      //     2 * Math.PI
+      //   );
+      //   ctx.fill();
+      // });
+
+      // Desenhar cílios
+      if (selectedEyelash) {
+        const eyeLandmarks = {
+          left: landmarks[33], // Substitua pelo índice do canto interno do olho esquerdo
+          right: landmarks[133], // Substitua pelo índice do canto externo do olho esquerdo
+        };
+
+        const eyelashImg = new Image();
+        eyelashImg.src = selectedEyelash;
+        eyelashImg.onload = () => {
+          const eyeWidth =
+            (eyeLandmarks.right.point.x - eyeLandmarks.left.point.x) * scale;
+          const eyeHeight = eyeWidth / 2; // Proporção aproximada, ajuste conforme necessário
+          const eyeX =
+            xOffset + eyeLandmarks.left.point.x * scale - eyeWidth / 4;
+          const eyeY =
+            yOffset + eyeLandmarks.left.point.y * scale - eyeHeight / 2;
+
+          ctx.drawImage(eyelashImg, eyeX, eyeY, eyeWidth, eyeHeight);
+        };
       }
     }
-  }, [selectedImage, landmarks]);
+  }, [selectedImage, landmarks, selectedEyelash]);
 
   const saveImageToFile = async (
     base64Image: string
@@ -169,8 +203,38 @@ const ExploreContainer: React.FC = () => {
       >
         <canvas
           ref={canvasRef}
-          style={{ width: "100%", height: "100%", objectFit: "contain" }}
+          style={{ width: "100%", height: "100%" }}
         ></canvas>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          gap: "1rem",
+          padding: "2rem 1rem",
+        }}
+      >
+        {eyelashes.map((eyelash) => (
+          <div
+            key={eyelash.index}
+            style={{
+              width: "80px",
+              height: "80px",
+              display: "grid",
+              placeItems: "center",
+              background: "#dfdfdf",
+              borderRadius: ".5rem",
+              cursor: "pointer",
+            }}
+            onClick={() => setSelectedEyelash(eyelash.src)}
+          >
+            <img
+              src={eyelash.src}
+              alt=""
+              style={{ pointerEvents: "none", height: "50%" }}
+            />
+          </div>
+        ))}
       </div>
     </div>
   );
